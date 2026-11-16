@@ -1,0 +1,112 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import butter, sosfiltfilt, sosfreqz
+
+# 1. Definición de la señal de entrada
+fs = 1000                 # Frecuencia de muestreo: 1000 muestras por segundo
+duracion = 2              # Duración de la señal en segundos
+t = np.arange(0, duracion, 1/fs)
+
+# Señal compuesta: 5 Hz (baja), 50 Hz (media) y 180 Hz (alta)
+np.random.seed(7)         # Permite repetir el mismo ejemplo
+senal_util = (1.0*np.sin(2*np.pi*5*t)
+              + 0.6*np.sin(2*np.pi*50*t)
+              + 0.4*np.sin(2*np.pi*180*t))
+ruido = 0.35*np.random.normal(size=len(t))
+senal_ruidosa = senal_util + ruido
+
+# 2. Diseño de filtros Butterworth
+# Pasa bajas: conserva frecuencias menores a 20 Hz
+sos_bajas = butter(4, 20, btype='lowpass', fs=fs, output='sos')
+# Pasa altas: conserva frecuencias mayores a 100 Hz
+sos_altas = butter(4, 100, btype='highpass', fs=fs, output='sos')
+# Pasa bandas: conserva frecuencias entre 35 y 70 Hz
+sos_bandas = butter(4, [35, 70], btype='bandpass', fs=fs, output='sos')
+
+# 3. Aplicación de los filtros
+# sosfiltfilt aplica el filtro hacia adelante y hacia atrás para evitar
+# el desplazamiento de fase en esta demostración.
+salida_bajas = sosfiltfilt(sos_bajas, senal_ruidosa)
+salida_altas = sosfiltfilt(sos_altas, senal_ruidosa)
+salida_bandas = sosfiltfilt(sos_bandas, senal_ruidosa)
+
+# 4. Gráficas en el dominio del tiempo
+plt.figure(figsize=(12, 8))
+plt.subplot(4, 1, 1)
+plt.plot(t, senal_ruidosa, linewidth=0.8)
+plt.title("Señal original con ruido")
+plt.ylabel("Amplitud")
+plt.xlim(0, 0.5)
+plt.grid(True)
+
+plt.subplot(4, 1, 2)
+plt.plot(t, salida_bajas)
+plt.title("Filtro pasa bajas (20 Hz)")
+plt.ylabel("Amplitud")
+plt.xlim(0, 0.5)
+plt.grid(True)
+
+plt.subplot(4, 1, 3)
+plt.plot(t, salida_altas)
+plt.title("Filtro pasa altas (100 Hz)")
+plt.ylabel("Amplitud")
+plt.xlim(0, 0.5)
+plt.grid(True)
+
+plt.subplot(4, 1, 4)
+plt.plot(t, salida_bandas)
+plt.title("Filtro pasa bandas (35 a 70 Hz)")
+plt.xlabel("Tiempo (s)")
+plt.ylabel("Amplitud")
+plt.xlim(0, 0.5)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# 5. Comparación en el dominio de la frecuencia mediante FFT
+def espectro(x):
+    frecuencias = np.fft.rfftfreq(len(x), d=1/fs)
+    magnitud = np.abs(np.fft.rfft(x)) * 2 / len(x)
+    return frecuencias, magnitud
+
+plt.figure(figsize=(12, 7))
+for x, nombre in [
+    (senal_ruidosa, "Original"),
+    (salida_bajas, "Pasa bajas"),
+    (salida_altas, "Pasa altas"),
+    (salida_bandas, "Pasa bandas")
+]:
+    f, mag = espectro(x)
+    plt.plot(f, mag, label=nombre, linewidth=1)
+
+plt.title("Comparación de espectros de frecuencia")
+plt.xlabel("Frecuencia (Hz)")
+plt.ylabel("Magnitud")
+plt.xlim(0, 250)
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# 6. Respuesta en frecuencia de cada filtro
+plt.figure(figsize=(10, 6))
+for sos, nombre in [
+    (sos_bajas, "Pasa bajas"),
+    (sos_altas, "Pasa altas"),
+    (sos_bandas, "Pasa bandas")
+]:
+    f, h = sosfreqz(sos, worN=2048, fs=fs)
+    respuesta_db = 20*np.log10(np.maximum(np.abs(h), 1e-8))
+    plt.plot(f, respuesta_db, label=nombre)
+
+plt.title("Respuesta en frecuencia de los filtros Butterworth")
+plt.xlabel("Frecuencia (Hz)")
+plt.ylabel("Ganancia (dB)")
+plt.xlim(0, 250)
+plt.ylim(-80, 5)
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+print("Proceso terminado: se generaron las señales filtradas y las gráficas.") 
